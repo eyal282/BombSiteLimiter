@@ -2,9 +2,19 @@
 #include <colors>
 #include <sdktools>
 
+
+#undef REQUIRE_PLUGIN
+#undef REQUIRE_EXTENSIONS
+#tryinclude <updater>  // Comment out this line to remove updater support by force.
+#define REQUIRE_PLUGIN
+#define REQUIRE_EXTENSIONS
+
+#define UPDATE_URL "https://raw.githubusercontent.com/eyal282/BombSiteLimiter/master/addons/updatefile.txt"
+
 #define PLUGIN_VERSION "1.0"
 
 #pragma newdecls required
+#pragma semicolon 1
 
 char PropModels[][] = 
 {
@@ -15,6 +25,7 @@ char PropModels[][] =
 	"models/props_c17/fence01b.mdl", 
 	"models/props_c17/fence02b.mdl"
 };
+
 enum struct propData
 {
 	int iSerial;
@@ -99,8 +110,25 @@ public void OnPluginStart()
 	RegAdminCmd("refreshprops", CmdReloadProps, ADMFLAG_ROOT);
 	RegAdminCmd("sm_sitelimiter", Command_SiteLimiter, ADMFLAG_ROOT);
 	CreateConVar("abner_maprestrictions_version", PLUGIN_VERSION, "Plugin version", FCVAR_NOTIFY | FCVAR_REPLICATED);
+	
+	#if defined _updater_included
+	if (LibraryExists("updater"))
+	{
+		Updater_AddPlugin(UPDATE_URL);
+	}
+	#endif
 }
 
+
+public void OnLibraryAdded(const char[] name)
+{
+	#if defined _updater_included
+	if (StrEqual(name, "updater"))
+	{
+		Updater_AddPlugin(UPDATE_URL);
+	}
+	#endif
+}
 
 public void ConnectToDatabase()
 {
@@ -196,7 +224,7 @@ public int SiteLimiterMenu_Handler(Handle hMenu, MenuAction action, int client, 
 			case 3, 4:
 			{
 				DeleteAllProps();
-				CurrentSite = item == 3 ? SITE_A : SITE_B
+				CurrentSite = item == 3 ? SITE_A : SITE_B;
 				
 				CreateProps();
 				
@@ -307,7 +335,7 @@ void CreateBlockade(int client, Handle DP)
 	FormatEx(sOrigin, sizeof(sOrigin), "%.4f %.4f %.4f", fOrigin[0], fOrigin[1], fOrigin[2]);
 	FormatEx(sAngles, sizeof(sAngles), "%.4f %.4f %.4f", fAngles[0], fAngles[1], fAngles[2]);
 	
-	SQL_FormatQuery(g_hDB, sQuery, sizeof(sQuery), "INSERT INTO SiteLimiter_Props (sMapName, sModel, sOrigin, sAngles, iSite) VALUES ('%s', '%s', '%s', '%s', %i)", g_sMapName, sModel, sOrigin, sAngles, site)
+	SQL_FormatQuery(g_hDB, sQuery, sizeof(sQuery), "INSERT INTO SiteLimiter_Props (sMapName, sModel, sOrigin, sAngles, iSite) VALUES ('%s', '%s', '%s', '%s', %i)", g_sMapName, sModel, sOrigin, sAngles, site);
 	
 	SQL_TQuery(g_hDB, SQLCB_BlockadeCreated, sQuery, GetClientUserId(client));
 }
@@ -453,7 +481,7 @@ public int SiteLimiterEditMenu_Handler(Handle hMenu, MenuAction action, int clie
 				FormatEx(sOrigin, sizeof(sOrigin), "%.4f %.4f %.4f", fOrigin[0], fOrigin[1], fOrigin[2]);
 				FormatEx(sAngles, sizeof(sAngles), "%.4f %.4f %.4f", fAngles[0], fAngles[1], fAngles[2]);
 				
-				SQL_FormatQuery(g_hDB, sQuery, sizeof(sQuery), "INSERT INTO SiteLimiter_Props (sMapName, sModel, sOrigin, sAngles, iSite) VALUES ('%s', '%s', '%s', '%s', %i)", g_sMapName, sModel, sOrigin, sAngles, CurrentSite)
+				SQL_FormatQuery(g_hDB, sQuery, sizeof(sQuery), "INSERT INTO SiteLimiter_Props (sMapName, sModel, sOrigin, sAngles, iSite) VALUES ('%s', '%s', '%s', '%s', %i)", g_sMapName, sModel, sOrigin, sAngles, CurrentSite);
 				
 				SQL_TQuery(g_hDB, SQLCB_BlockadeCreated, sQuery, GetClientUserId(client));
 				
@@ -792,7 +820,8 @@ public Action EventRoundStart(Handle ev, char[] name, bool db)
 	
 	Call_PushCellRef(CurrentSite);
 	
-	Action result
+	Action result;
+	
 	Call_Finish(result);
 	
 	if (result != Plugin_Continue && result != Plugin_Changed)
