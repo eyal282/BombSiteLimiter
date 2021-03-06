@@ -100,7 +100,7 @@ public void OnPluginEnd()
 }
 public void OnPluginStart()
 {
-	AutoExecConfig(true, "abner_maprestrictions");
+	AutoExecConfig(true, "bomb_site_limiter");
 	
 	g_fwOnSitePicked = CreateGlobalForward("BombSiteLimiter_OnSitePicked", ET_Event, Param_CellByRef);
 	g_aProps = new ArrayList();
@@ -109,7 +109,9 @@ public void OnPluginStart()
 	HookEvent("round_start", EventRoundStart);
 	RegAdminCmd("refreshprops", CmdReloadProps, ADMFLAG_ROOT);
 	RegAdminCmd("sm_sitelimiter", Command_SiteLimiter, ADMFLAG_ROOT);
-	CreateConVar("abner_maprestrictions_version", PLUGIN_VERSION, "Plugin version", FCVAR_NOTIFY | FCVAR_REPLICATED);
+	RegAdminCmd("sm_bombsitelimiter", Command_SiteLimiter, ADMFLAG_ROOT);
+	RegAdminCmd("sm_bomblimiter", Command_SiteLimiter, ADMFLAG_ROOT);
+	CreateConVar("bomb_site_limiter_version", PLUGIN_VERSION, "Plugin version", FCVAR_NOTIFY | FCVAR_REPLICATED);
 	
 	#if defined _updater_included
 	if (LibraryExists("updater"))
