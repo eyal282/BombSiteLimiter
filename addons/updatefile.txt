@@ -1,0 +1,16 @@
+"Information"
+{
+	"Version"
+	{
+		"Latest"	"1.0"
+	}
+	
+	"Notes"	"Plugin Release"
+}
+	
+"Files"
+{
+	"Plugin"	"Path_SM/plugins/BombSiteLimiter.smx"
+	
+	"Source"	"Path_SM/scripting/BombSiteLimiter.sp"
+}
