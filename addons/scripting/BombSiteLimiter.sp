@@ -1,4 +1,5 @@
 #include <sourcemod>
+#include <cstrike>
 #include <colors>
 #include <sdktools>
 
@@ -11,7 +12,7 @@
 
 #define UPDATE_URL "https://raw.githubusercontent.com/eyal282/BombSiteLimiter/master/addons/updatefile.txt"
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.1"
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -43,6 +44,15 @@ float g_fPrecision[MAXPLAYERS + 1];
 Handle g_hDB;
 
 Handle g_fwOnSitePicked;
+Handle g_fwOnSitePickedPost;
+
+Handle g_hcvSiteAMin;
+Handle g_hcvSiteAMax;
+
+Handle g_hcvSiteBMin;
+Handle g_hcvSiteBMax;
+
+Handle g_hcvIgnoreWarmup;
 
 enum enSite
 {
@@ -98,20 +108,50 @@ public void OnPluginEnd()
 {
 	DeleteAllProps();
 }
+/*
+* Return plugin handled or higher to block prop spawn.
+
+* Note: does not fire if there are no props to spawn.
+*/
+
+forward Action BombSiteLimiter_OnSitePicked(int& CurrentSite);
+	
+	
+/* Props are already spawned here.
+* Return plugin handled or higher to block chat message.
+
+* Note: does not fire if there are no props to spawn.
+*/
+
+forward Action BombSiteLimiter_OnSitePickedPost(int CurrentSite);
+	
+
 public void OnPluginStart()
 {
 	AutoExecConfig(true, "bomb_site_limiter");
 	
+	
 	g_fwOnSitePicked = CreateGlobalForward("BombSiteLimiter_OnSitePicked", ET_Event, Param_CellByRef);
+	g_fwOnSitePickedPost = CreateGlobalForward("BombSiteLimiter_OnSitePickedPost", ET_Event, Param_Cell);
+	
 	g_aProps = new ArrayList();
 	g_aPropData = new ArrayList(sizeof(propData));
 	
-	HookEvent("round_start", EventRoundStart);
+	HookEvent("round_start", EventRoundStart, EventHookMode_PostNoCopy);
+	
 	RegAdminCmd("refreshprops", CmdReloadProps, ADMFLAG_ROOT);
 	RegAdminCmd("sm_sitelimiter", Command_SiteLimiter, ADMFLAG_ROOT);
 	RegAdminCmd("sm_bombsitelimiter", Command_SiteLimiter, ADMFLAG_ROOT);
 	RegAdminCmd("sm_bomblimiter", Command_SiteLimiter, ADMFLAG_ROOT);
 	CreateConVar("bomb_site_limiter_version", PLUGIN_VERSION, "Plugin version", FCVAR_NOTIFY | FCVAR_REPLICATED);
+	
+	g_hcvSiteAMin = CreateConVar("bomb_site_limiter_site_a_min", "0", "Minimum amount of players for A site to be pickable.");
+	g_hcvSiteAMax = CreateConVar("bomb_site_limiter_site_a_max", "5", "Maximum amount of players for A site to be pickable.");
+	
+	g_hcvSiteBMin = CreateConVar("bomb_site_limiter_site_b_min", "0", "Minimum amount of players for B site to be pickable.");
+	g_hcvSiteBMax = CreateConVar("bomb_site_limiter_site_b_max", "5", "Maximum amount of players for B site to be pickable.");
+	
+	g_hcvIgnoreWarmup = CreateConVar("bomb_site_limiter_ignore_warmup", "1", "If set to 1, props are not placed during the warmup.");
 	
 	#if defined _updater_included
 	if (LibraryExists("updater"))
@@ -816,7 +856,34 @@ public void SQLCB_ChickenSpawnDeleted(Handle db, Handle hndl, const char[] sErro
 public Action EventRoundStart(Handle ev, char[] name, bool db)
 {
 	
-	CurrentSite = GetRandomInt(0, 1) == 1 ? SITE_A : SITE_B;
+	if(g_aPropData.Length == 0)
+		return Plugin_Continue;
+		
+	else if(GetConVarBool(g_hcvIgnoreWarmup) && GameRules_GetProp("m_bWarmupPeriod"))
+		return Plugin_Continue;
+		
+	bool bSiteAPickable;
+	bool bSiteBPickable;
+	
+	int count = GetPlayerCount();
+	
+	if(count >= GetConVarInt(g_hcvSiteAMin) && count <= GetConVarInt(g_hcvSiteAMax))
+		bSiteAPickable = true;
+
+	if(count >= GetConVarInt(g_hcvSiteBMin) && count <= GetConVarInt(g_hcvSiteBMax))
+		bSiteBPickable = true;
+	
+	if(bSiteAPickable && bSiteBPickable)
+		CurrentSite = GetRandomInt(0, 1) == 1 ? SITE_A : SITE_B;
+		
+	else if(bSiteAPickable)
+		CurrentSite = SITE_A;
+		
+	else if(bSiteBPickable)
+		CurrentSite = SITE_B;
+		
+	else
+		CurrentSite = SITE_ANY;
 	
 	Call_StartForward(g_fwOnSitePicked);
 	
@@ -828,10 +895,23 @@ public Action EventRoundStart(Handle ev, char[] name, bool db)
 	
 	if (result != Plugin_Continue && result != Plugin_Changed)
 		return Plugin_Continue;
-	
+		
 	if (CurrentSite != SITE_ANY)
 		CreateProps();
+
+	Call_StartForward(g_fwOnSitePickedPost);
 	
+	Call_PushCell(CurrentSite);
+	
+	Call_Finish(result);
+
+	if (result != Plugin_Continue && result != Plugin_Changed)
+		return Plugin_Continue;
+	
+	
+	if (CurrentSite != SITE_ANY)	
+		PrintToChatAll(" \x01The current site is\x03 %s", CurrentSite == SITE_A ? "A" : "B");
+		
 	return Plugin_Continue;
 }
 
@@ -983,3 +1063,26 @@ stock int FindEntRefInArray(ArrayList Array, int entity)
 	
 	return -1;
 } 
+
+stock int GetPlayerCount()
+{
+	int count;
+	
+	for (int i = 1; i <= MaxClients;i++)
+	{
+		if(!IsClientInGame(i))
+			continue;
+			
+		else if(!UC_IsValidTeam(i))
+			continue;
+			
+		count++;
+	}
+	
+	return count;
+}
+
+stock bool UC_IsValidTeam(int client)
+{
+	return (GetClientTeam(client) == CS_TEAM_T || GetClientTeam(client) == CS_TEAM_CT);
+}
