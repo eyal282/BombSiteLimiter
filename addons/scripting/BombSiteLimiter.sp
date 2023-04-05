@@ -27,6 +27,13 @@ char PropModels[][] =
 	"models/props_c17/fence02b.mdl"
 };
 
+enum enSite
+{
+	SITE_ANY = -1, 
+	SITE_A = 0, 
+	SITE_B = 1
+}
+
 enum struct propData
 {
 	int iSerial;
@@ -53,13 +60,6 @@ Handle g_hcvSiteBMin;
 Handle g_hcvSiteBMax;
 
 Handle g_hcvIgnoreWarmup;
-
-enum enSite
-{
-	SITE_ANY = -1, 
-	SITE_A = 0, 
-	SITE_B = 1
-}
 
 char g_sMapName[64];
 
